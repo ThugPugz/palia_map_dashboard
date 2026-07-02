@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>Palia Companion Map</title>
+
+<style>
+:root{
+  --bg:#0f0f14;
+  --panel:rgba(255,255,255,0.06);
+  --text:#fff;
+  --accent:#ff7ac6;
+  --accent2:#7ad7ff;
+}
+
+body.cute {
+  --bg: linear-gradient(135deg,#1b1020,#2a1630,#141018);
+  --panel: rgba(255,255,255,0.08);
+  --accent:#ff7ac6;
+}
+
+body.clean {
+  --bg:#0b0c10;
+  --panel:rgba(255,255,255,0.05);
+  --accent:#ffffff;
+}
+
+body{
+  margin:0;
+  font-family:Segoe UI, sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  overflow:hidden;
+}
+
+#topbar{
+  height:50px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 12px;
+  background:rgba(0,0,0,0.4);
+  backdrop-filter:blur(10px);
+}
+
+#zones button{
+  margin-right:6px;
+  border:none;
+  padding:6px 10px;
+  border-radius:10px;
+  background:var(--panel);
+  color:var(--text);
+  cursor:pointer;
+}
+
+#zones button.active{
+  background:var(--accent);
+  color:#000;
+}
+
+#container{
+  display:flex;
+  height:calc(100vh - 50px);
+}
+
+#mapWrap{
+  flex:3;
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+#map{
+  width:95%;
+  height:90%;
+  border-radius:18px;
+  background:#222;
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 0 40px rgba(0,0,0,0.5);
+}
+
+#map img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  filter:contrast(1.1) saturate(1.1);
+}
+
+/* Pins */
+.pin{
+  position:absolute;
+  width:14px;
+  height:14px;
+  border-radius:50%;
+  background:var(--accent);
+  border:2px solid #fff;
+  transform:translate(-50%,-50%);
+  cursor:pointer;
+}
+
+/* Sidebar */
+#sidebar{
+  flex:1;
+  background:rgba(0,0,0,0.35);
+  backdrop-filter:blur(10px);
+  padding:12px;
+  overflow:auto;
+}
+
+.section{
+  margin-bottom:16px;
+  padding:10px;
+  background:var(--panel);
+  border-radius:12px;
+}
+
+h3{
+  margin:0 0 8px 0;
+  font-size:14px;
+  opacity:0.9;
+}
+
+/* Buttons */
+.toggle{
+  display:block;
+  margin:4px 0;
+  padding:6px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.06);
+  cursor:pointer;
+}
+
+/* Timer */
+.timer{
+  font-size:18px;
+  text-align:center;
+  margin-top:6px;
+}
+
+/* small UI */
+.small{
+  font-size:12px;
+  opacity:0.7;
+}
+</style>
+</head>
+
+<body class="cute">
+
+<div id="topbar">
+  <div><b>Palia Companion Map</b></div>
+
+  <div id="zones">
+    <button class="active" onclick="setZone('kilima', this)">Kilima</button>
+    <button onclick="setZone('bahari', this)">Bahari</button>
+    <button onclick="setZone('elderwood', this)">Elderwood</button>
+  </div>
+
+  <div>
+    <button onclick="toggleMode()">Theme</button>
+    <button onclick="clearPins()">Clear Pins</button>
+  </div>
+</div>
+
+<div id="container">
+
+  <div id="mapWrap">
+    <div id="map" onclick="addPin(event)">
+      <img id="mapImg" src="" />
+    </div>
+  </div>
+
+  <div id="sidebar">
+
+    <div class="section">
+      <h3>Resources</h3>
+      <div class="toggle"><input type="checkbox" checked> Palium</div>
+      <div class="toggle"><input type="checkbox"> Flow Trees</div>
+      <div class="toggle"><input type="checkbox"> Fish Spots</div>
+      <div class="toggle"><input type="checkbox"> Bugs</div>
+      <div class="toggle"><input type="checkbox"> Forage</div>
+      <div class="small">Filters are visual-only for now (can be extended)</div>
+    </div>
+
+    <div class="section">
+      <h3>Timer</h3>
+      <div class="timer" id="timer">00:00</div>
+      <button onclick="startTimer()">Start</button>
+      <button onclick="resetTimer()">Reset</button>
+    </div>
+
+    <div class="section">
+      <h3>Live Notes</h3>
+      <textarea style="width:100%;height:120px;background:rgba(0,0,0,0.3);color:white;border:none;border-radius:8px;padding:6px;"></textarea>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+
+let zone = "kilima";
+let seconds = 0;
+let timerRunning = false;
+
+/* Placeholder maps (replace with your own images if you want higher quality) */
+const maps = {
+  kilima: "kilima.png",
+  bahari: "bahari.png",
+  elderwood: "elderwood.png"
+};
+
+function setZone(z, btn){
+  zone = z;
+
+  document.querySelectorAll("#zones button")
+    .forEach(b => b.classList.remove("active"));
+
+  btn.classList.add("active");
+
+  document.getElementById("mapImg").src = maps[z];
+  loadPins();
+}
+
+function toggleMode(){
+  document.body.classList.toggle("clean");
+  document.body.classList.toggle("cute");
+}
+
+function addPin(e){
+  const rect = document.getElementById("map").getBoundingClientRect();
+
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  const pin = {x,y,zone};
+
+  let data = JSON.parse(localStorage.getItem("pins") || "[]");
+  data.push(pin);
+  localStorage.setItem("pins", JSON.stringify(data));
+
+  renderPin(pin);
+}
+
+function renderPin(pin){
+  if(pin.zone !== zone) return;
+
+  const el = document.createElement("div");
+  el.className = "pin";
+  el.style.left = pin.x + "px";
+  el.style.top = pin.y + "px";
+  document.getElementById("map").appendChild(el);
+}
+
+function loadPins(){
+  document.querySelectorAll(".pin").forEach(p=>p.remove());
+
+  let data = JSON.parse(localStorage.getItem("pins") || "[]");
+  data.forEach(renderPin);
+}
+
+function clearPins(){
+  localStorage.removeItem("pins");
+  loadPins();
+}
+
+/* Timer */
+function startTimer(){
+  if(timerRunning) return;
+  timerRunning = true;
+
+  setInterval(()=>{
+    if(timerRunning){
+      seconds++;
+      document.getElementById("timer").innerText =
+        new Date(seconds * 1000).toISOString().substr(14,5);
+    }
+  },1000);
+}
+
+function resetTimer(){
+  seconds = 0;
+  timerRunning = false;
+  document.getElementById("timer").innerText = "00:00";
+}
+
+/* init */
+document.getElementById("mapImg").src = maps.kilima;
+
+</script>
+
+</body>
+</html>
